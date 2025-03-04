@@ -54,6 +54,7 @@ from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseArray, TransformStamped
 from aruco_interfaces.msg import ArucoMarkers
+from aruco_interfaces.srv import EstimatePose
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from rclpy.qos import qos_profile_sensor_data, QoSHistoryPolicy, QoSProfile
 from tf2_ros import TransformBroadcaster
@@ -112,9 +113,11 @@ class ArucoNode(rclpy.node.Node):
             )
 
         # Set up publishers
-        self.poses_pub = self.create_publisher(PoseArray, self.markers_visualization_topic, 10)
-        self.markers_pub = self.create_publisher(ArucoMarkers, self.detected_markers_topic, 10)
-        self.image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+        # self.poses_pub = self.create_publisher(PoseArray, self.markers_visualization_topic, 10)
+        # self.markers_pub = self.create_publisher(ArucoMarkers, self.detected_markers_topic, 10)
+        # self.image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+
+        self.estimate_pose_server = self.create_service(EstimatePose, "/estimate_pose", self.estimate_pose_callback)
 
         # Set up fields for camera parameters
         self.info_msg = None
@@ -152,62 +155,7 @@ class ArucoNode(rclpy.node.Node):
             return
 
         # convert the image messages to cv2 format
-        cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
-
-        # create the ArucoMarkers and PoseArray messages
-        markers = ArucoMarkers()
-        pose_array = PoseArray()
-
-        # Set the frame id and timestamp for the markers and pose array
-        if self.camera_frame == "":
-            markers.header.frame_id = self.info_msg.header.frame_id
-            pose_array.header.frame_id = self.info_msg.header.frame_id
-        else:
-            markers.header.frame_id = self.camera_frame
-            pose_array.header.frame_id = self.camera_frame
-
-        markers.header.stamp = img_msg.header.stamp
-        pose_array.header.stamp = img_msg.header.stamp
-
-        """
-        # OVERRIDE: use calibrated intrinsic matrix and distortion coefficients
-        self.intrinsic_mat = np.reshape([615.95431, 0., 325.26983,
-                                         0., 617.92586, 257.57722,
-                                         0., 0., 1.], (3, 3))
-        self.distortion = np.array([0.142588, -0.311967, 0.003950, -0.006346, 0.000000])
-        """
-        
-        # call the pose estimation function
-        frame, pose_array, markers = pose_estimation(rgb_frame=cv_image, depth_frame=None,
-                                                     aruco_detector=self.aruco_detector,
-                                                     marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
-                                                     distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
-
-        # if some markers are detected
-        if len(markers.marker_ids) > 0:
-            # Publish the results with the poses and markes positions
-            self.poses_pub.publish(pose_array)
-            self.markers_pub.publish(markers)
-            t = TransformStamped()
-
-            # Read message content and assign it to
-            # corresponding tf variables
-            t.header.stamp = self.get_clock().now().to_msg()
-            t.header.frame_id = self.camera_frame
-            t.child_frame_id = 'aruco_marker'
-
-            t.transform.translation.x = pose_array.poses[0].position.x
-            t.transform.translation.y = pose_array.poses[0].position.y
-            t.transform.translation.z = pose_array.poses[0].position.z
-
-            t.transform.rotation.x = pose_array.poses[0].orientation.x
-            t.transform.rotation.y = pose_array.poses[0].orientation.y
-            t.transform.rotation.z = pose_array.poses[0].orientation.z
-            t.transform.rotation.w = pose_array.poses[0].orientation.w
-            self.tf_broadcaster.sendTransform(t)
-
-        # publish the image frame with computed markers positions over the image
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
+        self.cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
 
     def depth_image_callback(self, depth_msg: Image):
         if self.info_msg is None:
@@ -391,7 +339,52 @@ class ArucoNode(rclpy.node.Node):
             self.get_parameter("output_image_topic").get_parameter_value().string_value
         )
 
+    def estimate_pose_callback(self, request, response):
 
+        markers = ArucoMarkers()
+        pose_array = PoseArray()
+        if self.camera_frame == "":
+            markers.header.frame_id = self.info_msg.header.frame_id
+            pose_array.header.frame_id = self.info_msg.header.frame_id
+        else:
+            markers.header.frame_id = self.camera_frame
+            pose_array.header.frame_id = self.camera_frame
+
+        transform = TransformStamped()
+
+        try:
+            frame, pose_array, markers = pose_estimation(rgb_frame=self.cv_image, depth_frame=None,
+                                                     aruco_detector=self.aruco_detector,
+                                                     marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
+                                                     distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
+            # Return the first pose as the transform
+            if len(markers.marker_ids)>0:
+                transform.header.stamp = self.get_clock().now().to_msg()
+                transform.header.frame_id = self.camera_frame
+                transform.child_frame_id = request.child_frame_id
+
+                transform.transform.translation.x = pose_array.poses[0].position.x
+                transform.transform.translation.y = pose_array.poses[0].position.y
+                transform.transform.translation.z = pose_array.poses[0].position.z
+
+                transform.transform.rotation.x = pose_array.poses[0].orientation.x
+                transform.transform.rotation.y = pose_array.poses[0].orientation.y
+                transform.transform.rotation.z = pose_array.poses[0].orientation.z
+                transform.transform.rotation.w = pose_array.poses[0].orientation.w
+                
+                if request.publish_tf:
+                    self.tf_broadcaster.sendTransform(transform)
+                
+                response.success = True
+                response.transform = transform
+            else:
+                raise ValueError("Pose array is empty")
+        except Exception as e:
+            self.get_logger().error(f"Error in pose estimation: {e}")
+            response.success = False
+    
+        return response
+    
 def main():
     rclpy.init()
     node = ArucoNode()

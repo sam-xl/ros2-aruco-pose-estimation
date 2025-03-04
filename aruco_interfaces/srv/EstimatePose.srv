@@ -1,0 +1,5 @@
+bool publish_tf false   # publish the transform once
+string child_frame_id 'aruco_marker'    # the transform is created with this frame id
+---
+bool success
+geometry_msgs/TransformStamped transform
