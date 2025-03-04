@@ -38,7 +38,6 @@ Version: 2024-01-29
 # ROS2 imports
 import rclpy
 import rclpy.node
-from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
 import message_filters
 
@@ -53,10 +52,12 @@ from aruco_pose_estimation.pose_estimation import pose_estimation
 # ROS2 message imports
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import PoseArray, TransformStamped
 from aruco_interfaces.msg import ArucoMarkers
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy, QoSHistoryPolicy
+from rclpy.qos import qos_profile_sensor_data, QoSHistoryPolicy, QoSProfile
+from tf2_ros import TransformBroadcaster
+
 
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
@@ -83,6 +84,7 @@ class ArucoNode(rclpy.node.Node):
         self.info_sub = self.create_subscription(
             CameraInfo, self.info_topic, self.info_callback, qos_profile_sensor_data
         )
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # select the type of input to use for the pose estimation
         if (bool(self.use_depth_input)):
@@ -90,7 +92,7 @@ class ArucoNode(rclpy.node.Node):
 
             # create a message filter to synchronize the image and depth image topics
             self.image_sub = message_filters.Subscriber(self, Image, self.image_topic,
-                                                        qos_profile=qos_profile_sensor_data)
+                                                        qos_profile=QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=1))
             self.depth_image_sub = message_filters.Subscriber(self, Image, self.depth_image_topic,
                                                               qos_profile=QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=1))
 
@@ -186,6 +188,23 @@ class ArucoNode(rclpy.node.Node):
             # Publish the results with the poses and markes positions
             self.poses_pub.publish(pose_array)
             self.markers_pub.publish(markers)
+            t = TransformStamped()
+
+            # Read message content and assign it to
+            # corresponding tf variables
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = self.camera_frame
+            t.child_frame_id = 'aruco_marker'
+
+            t.transform.translation.x = pose_array.poses[0].position.x
+            t.transform.translation.y = pose_array.poses[0].position.y
+            t.transform.translation.z = pose_array.poses[0].position.z
+
+            t.transform.rotation.x = pose_array.poses[0].orientation.x
+            t.transform.rotation.y = pose_array.poses[0].orientation.y
+            t.transform.rotation.z = pose_array.poses[0].orientation.z
+            t.transform.rotation.w = pose_array.poses[0].orientation.w
+            self.tf_broadcaster.sendTransform(t)
 
         # publish the image frame with computed markers positions over the image
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
