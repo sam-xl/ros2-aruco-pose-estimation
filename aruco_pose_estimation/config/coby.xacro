@@ -1,0 +1,44 @@
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="samxl_coby">
+    
+    <xacro:arg name="fixed" default="true" />
+
+    
+    <link name="mid_mount" />
+
+    
+    <xacro:include filename="$(find cell_description)/urdf/cell_description_macro.xacro" />
+
+        
+    <xacro:cell_description_macro parent="rs" child="aruco_marker" add_parent="false">
+        <origin xyz="0.213 -0.188 0.807" rpy="-3.111 1.001 -1.514" />  
+    </xacro:cell_description_macro>
+
+    <xacro:arg name="ridgeback_arm_height" default="$(optenv RIDGEBACK_ARM_HEIGHT 0.6)" />
+    <xacro:arg name="ridgeback_arm_angle" default="$(optenv RIDGEBACK_ARM_ANGLE 0.0)" />
+    <xacro:arg name="ridgeback_bottom_plate_height" default="0.3" />
+  
+    <material name="dark_grey"><color rgba="0.2 0.2 0.2 1.0" /></material>
+    <material name="light_grey"><color rgba="0.4 0.4 0.4 1.0" /></material>
+    <material name="red"><color rgba="0.8 0.0 0.0 1.0" /></material>
+    <material name="white"><color rgba="0.9 0.9 0.9 1.0" /></material>
+    <material name="yellow"><color rgba="0.8 0.8 0.0 1.0" /></material>
+    <material name="black"><color rgba="0.15 0.15 0.15 1.0" /></material>
+
+    <xacro:include filename="$(find samxl_ridgeback_description)/urdf/samxl_ridgeback_hams.urdf.xacro" />
+    
+
+    
+    <xacro:include filename="$(find samxl_ur10e_description)/urdf/samxl_ur10e_robot_macro.xacro" />
+    <xacro:samxl_ur10e_robot parent="arm_mount_hams_plate_link" prefix="ur10e_">
+        
+        <origin xyz="0 0 0" rpy="0.0 0.0 0" />   
+    </xacro:samxl_ur10e_robot>
+
+    
+    <xacro:include filename="$(find samxl_common_description)/urdf/lls_rs_macro.xacro" />
+
+    <xacro:lls_rs_macro parent="ur10e_tool0" child="mount_link" tcp_offset="0.06">
+        <origin xyz="0.005 0.03 0.0" rpy="${radians(90)} 0 ${radians(90)}" />
+    </xacro:lls_rs_macro>
+
+</robot>
