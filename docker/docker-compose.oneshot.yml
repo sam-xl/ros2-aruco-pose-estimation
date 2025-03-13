@@ -1,0 +1,19 @@
+services:
+  pose_estimation-server:
+    extends:
+      file: ${POSE_EST_SRC_DIR}/docker/docker-compose.yml
+      service: pose_estimation-server
+
+  pose_estimation-client:
+    depends_on:
+      pose_estimation-server:
+          condition: service_started
+    image: pose_estimation:latest
+    working_dir: ${TARGET_WS_DIR}
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}
+    network_mode: host
+    ipc: host
+    command: /bin/bash -c 'source install/setup.bash && ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose'
+    
