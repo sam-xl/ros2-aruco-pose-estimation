@@ -1,4 +1,5 @@
 bool publish_tf false   # publish the transform once
+string parent_frame_id 'camera_link'    # the transform is with respect to this frame id
 string child_frame_id 'aruco_marker'    # the transform is created with this frame id
 ---
 bool success
