@@ -92,7 +92,7 @@ class PoseEstimationClient(Node):
     def transform_to_pose(transform):
         xyz = transform.translation
         quat = transform.rotation
-        rpy = Rotation.from_quat([quat.x, quat.y, quat.z, quat.z]).as_euler('xyz')
+        rpy = Rotation.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler('xyz')
         return xyz, rpy
 
     def update_cell_description(self, cell_description, transform):
