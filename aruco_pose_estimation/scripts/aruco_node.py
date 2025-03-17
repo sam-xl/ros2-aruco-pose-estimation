@@ -57,8 +57,8 @@ from aruco_interfaces.msg import ArucoMarkers
 from aruco_interfaces.srv import EstimatePose
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from rclpy.qos import qos_profile_sensor_data, QoSHistoryPolicy, QoSProfile
-from tf2_ros import TransformBroadcaster
-
+from tf2_ros import TransformBroadcaster, TransformListener, Buffer
+from tf2_geometry_msgs.tf2_geometry_msgs import _decompose_affine, _transform_to_affine
 
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
@@ -88,6 +88,9 @@ class ArucoNode(rclpy.node.Node):
         self.info_sub = self.create_subscription(
             CameraInfo, self.info_topic, self.info_callback, qos_profile_sensor_data
         )
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # select the type of input to use for the pose estimation
@@ -359,7 +362,7 @@ class ArucoNode(rclpy.node.Node):
             markers.header.frame_id = self.camera_frame
             pose_array.header.frame_id = self.camera_frame
 
-        transform = TransformStamped()
+        T_marker_cam = TransformStamped()
 
         try:
             frame, pose_array, markers = pose_estimation(rgb_frame=self.cv_image, depth_frame=None,
@@ -368,24 +371,32 @@ class ArucoNode(rclpy.node.Node):
                                                      distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
             # Return the first pose as the transform
             if len(markers.marker_ids)>0:
-                transform.header.stamp = self.get_clock().now().to_msg()
-                transform.header.frame_id = self.camera_frame
-                transform.child_frame_id = request.child_frame_id
+                T_marker_cam.header.stamp = self.get_clock().now().to_msg()
+                T_marker_cam.header.frame_id = "rs"
+                T_marker_cam.child_frame_id = request.child_frame_id
 
-                transform.transform.translation.x = pose_array.poses[0].position.x
-                transform.transform.translation.y = pose_array.poses[0].position.y
-                transform.transform.translation.z = pose_array.poses[0].position.z
+                T_marker_cam.transform.translation.x = pose_array.poses[0].position.x
+                T_marker_cam.transform.translation.y = pose_array.poses[0].position.y
+                T_marker_cam.transform.translation.z = pose_array.poses[0].position.z
 
-                transform.transform.rotation.x = pose_array.poses[0].orientation.x
-                transform.transform.rotation.y = pose_array.poses[0].orientation.y
-                transform.transform.rotation.z = pose_array.poses[0].orientation.z
-                transform.transform.rotation.w = pose_array.poses[0].orientation.w
+                T_marker_cam.transform.rotation.x = pose_array.poses[0].orientation.x
+                T_marker_cam.transform.rotation.y = pose_array.poses[0].orientation.y
+                T_marker_cam.transform.rotation.z = pose_array.poses[0].orientation.z
+                T_marker_cam.transform.rotation.w = pose_array.poses[0].orientation.w
                 
                 if request.publish_tf:
-                    self.tf_broadcaster.sendTransform(transform)
+                    self.tf_broadcaster.sendTransform(T_marker_cam)
                 
+                T_cam_base =  self.tf_buffer.lookup_transform("rs", request.parent_frame_id, rclpy.time.Time())
+                T_marker_base = _transform_to_affine(T_marker_cam)@_transform_to_affine(T_cam_base)
+                T_marker_cam = TransformStamped()
+                T_marker_cam.header.frame_id = request.parent_frame_id
+                T_marker_cam.child_frame_id = request.child_frame_id
+
+                T_marker_cam.transform.rotation, T_marker_cam.transform.translation = _decompose_affine(T_marker_base)
+
                 response.success = True
-                response.transform = transform
+                response.transform = T_marker_base
             else:
                 raise ValueError("Pose array is empty")
         except Exception as e:
