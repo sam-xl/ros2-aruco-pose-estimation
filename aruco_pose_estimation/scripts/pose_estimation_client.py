@@ -41,8 +41,9 @@ class PoseEstimationClient(Node):
             update_xacro = False    
         else:
             self.logger.info("Pose estimation successful.")
-            self.logger.info(f"Translation: {response.transform.transform.translation}")
-            self.logger.info(f"Received pose: rotation: {response.transform.transform.rotation}")
+            xyz, rpy = self.transform_to_pose(response.transform.transform)
+            self.logger.info(f"Translation [xyz, metres]: {xyz}")
+            self.logger.info(f"Rotation [rpy, radians]: {rpy}")
 
         if update_xacro:
             xacro_path = self.get_parameter("xacro_path").get_parameter_value().string_value
@@ -88,18 +89,20 @@ class PoseEstimationClient(Node):
         tree.write(xacro_path)
 
     @staticmethod
-    def update_cell_description(cell_description, transform):
+    def transform_to_pose(transform):
+        xyz = transform.translation
+        quat = transform.rotation
+        rpy = Rotation.from_quat([quat.x, quat.y, quat.z, quat.z]).as_euler('xyz')
+        return xyz, rpy
+
+    def update_cell_description(self, cell_description, transform):
         cell_description.attrib["parent"] = transform.header.frame_id
         cell_description.attrib["child"] = transform.child_frame_id
 
-        origin = cell_description.find('origin')
-        position = transform.transform.translation
-        orientation = transform.transform.rotation
-        
-        origin.attrib['xyz'] = f"{position.x:0.3f} {position.y:0.3f} {position.z:0.3f}"
+        xyz, rpy = self.transform_to_pose(transform.transform)
 
-        rpy = Rotation.from_quat([orientation.x, orientation.y, orientation.z, orientation.z]).as_euler('xyz')
-
+        origin = cell_description.find('origin')        
+        origin.attrib['xyz'] = f"{xyz.x:0.3f} {xyz.y:0.3f} {xyz.z:0.3f}"
         origin.attrib['rpy'] = f"{rpy[0]:0.3f} {rpy[1]:0.3f} {rpy[2]:0.3f}"
 
     @staticmethod
