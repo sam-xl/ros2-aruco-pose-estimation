@@ -80,6 +80,9 @@ class ArucoNode(rclpy.node.Node):
             self.get_logger().error("valid options: {}".format(options))
 
         # Set up subscriptions to the camera info and camera image topics
+        self.future_rcv_image = rclpy.Future()  # this future is used to sync the service
+
+        self.bridge = CvBridge()
 
         # camera info topic for the camera calibration parameters
         self.info_sub = self.create_subscription(
@@ -117,8 +120,6 @@ class ArucoNode(rclpy.node.Node):
         # self.markers_pub = self.create_publisher(ArucoMarkers, self.detected_markers_topic, 10)
         # self.image_pub = self.create_publisher(Image, self.output_image_topic, 10)
 
-        self.estimate_pose_server = self.create_service(EstimatePose, "/estimate_pose", self.estimate_pose_callback)
-
         # Set up fields for camera parameters
         self.info_msg = None
         self.intrinsic_mat = None
@@ -133,7 +134,13 @@ class ArucoNode(rclpy.node.Node):
         # self.aruco_dictionary = cv2.aruco.Dictionary_get(dictionary_id)
         # self.aruco_parameters = cv2.aruco.DetectorParameters_create()
 
-        self.bridge = CvBridge()
+        rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 5)
+        if not self.future_rcv_image.done():
+            raise TimeoutError(
+                f"Timed out waiting for image on topic: {self.image_topic}. \n Check if: The image is being publised on the correct topic and namespace."
+            )
+
+        self.estimate_pose_server = self.create_service(EstimatePose, "/estimate_pose", self.estimate_pose_callback)
 
     def info_callback(self, info_msg):
         self.info_msg = info_msg
@@ -156,6 +163,8 @@ class ArucoNode(rclpy.node.Node):
 
         # convert the image messages to cv2 format
         self.cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
+        
+        self.future_rcv_image.set_result(None) # this future is used to sync the service
 
     def depth_image_callback(self, depth_msg: Image):
         if self.info_msg is None:

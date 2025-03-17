@@ -1,0 +1,9 @@
+<launch>
+    <node name="pose_estimation_client" pkg="aruco_pose_estimation" exec="pose_estimation_client.py" output="screen">
+        <param name="update_xacro" value="true"/>
+        <param name="xacro_path" value="$(find-pkg-share aruco_pose_estimation)/config/coby.xacro"/>
+        <param name="parent_frame_id" value="rs"/>
+        <param name="child_frame_id" value="aruco_marker"/>
+        <remap from="estimate_pose_srv" to="/estimate_pose"/>
+    </node>
+</launch>
