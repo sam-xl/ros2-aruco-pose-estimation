@@ -386,14 +386,25 @@ class ArucoNode(rclpy.node.Node):
                 
                 if request.publish_tf:
                     self.tf_broadcaster.sendTransform(T_marker_cam)
-                
-                T_cam_base =  self.tf_buffer.lookup_transform("rs", request.parent_frame_id, rclpy.time.Time())
-                T_marker_base = _transform_to_affine(T_marker_cam)@_transform_to_affine(T_cam_base)
-                T_marker_cam = TransformStamped()
-                T_marker_cam.header.frame_id = request.parent_frame_id
-                T_marker_cam.child_frame_id = request.child_frame_id
 
-                T_marker_cam.transform.rotation, T_marker_cam.transform.translation = _decompose_affine(T_marker_base)
+                # TODO change hardcoded rs. Currently done because frame name in urdf doesn't match self.camera_frame                
+                T_cam_base =  self.tf_buffer.lookup_transform(request.parent_frame_id, "rs" , rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
+                mat_marker_base = _transform_to_affine(T_cam_base)@_transform_to_affine(T_marker_cam) # marker with respect to base link
+                
+                # get transform from matrix
+                T_marker_base = TransformStamped()
+                T_marker_base.header.frame_id = request.parent_frame_id
+                T_marker_base.child_frame_id = request.child_frame_id
+
+                orientation, position = _decompose_affine(mat_marker_base)
+                T_marker_base.transform.translation.x = position[0]
+                T_marker_base.transform.translation.y = position[1]
+                T_marker_base.transform.translation.z = position[2]
+
+                T_marker_base.transform.rotation.x = orientation[1]
+                T_marker_base.transform.rotation.y = orientation[2]
+                T_marker_base.transform.rotation.z = orientation[3]
+                T_marker_base.transform.rotation.w = orientation[0]
 
                 response.success = True
                 response.transform = T_marker_base
