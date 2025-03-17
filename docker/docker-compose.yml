@@ -1,0 +1,13 @@
+services:
+  pose_estimation-server:
+    build:
+      context: ${POSE_EST_SRC_DIR}
+      dockerfile: docker/Dockerfile
+    image: pose_estimation:latest
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}
+    network_mode: host
+    ipc: host
+    command: /bin/bash -c 'source install/setup.bash && ros2 launch aruco_pose_estimation erf_demo.launch.xml image_topic:=${IMAGE_TOPIC} camera_frame:=${CAMERA_FRAME} tool_frame:=${TOOL_FRAME}'
+    
