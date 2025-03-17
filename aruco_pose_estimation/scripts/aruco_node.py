@@ -137,7 +137,7 @@ class ArucoNode(rclpy.node.Node):
         # self.aruco_dictionary = cv2.aruco.Dictionary_get(dictionary_id)
         # self.aruco_parameters = cv2.aruco.DetectorParameters_create()
 
-        rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 5)
+        rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 10)
         if not self.future_rcv_image.done():
             raise TimeoutError(
                 f"Timed out waiting for image on topic: {self.image_topic}. \n Check if: The image is being publised on the correct topic and namespace."

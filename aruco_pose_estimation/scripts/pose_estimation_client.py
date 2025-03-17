@@ -60,7 +60,7 @@ class PoseEstimationClient(Node):
         """Help in creating and handling service clients."""
         self.logger.info("Waiting for service..")
         client = self.create_client(srv_type, srv_name)
-        if not client.wait_for_service(timeout_sec=5.0):
+        if not client.wait_for_service(timeout_sec=10.0):
             remapped_srv_name = self.resolve_service_name(srv_name)
             msg = f"Timed out waiting for server: '{remapped_srv_name}'"
             if required:
