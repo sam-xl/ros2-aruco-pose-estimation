@@ -14,6 +14,8 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}
     network_mode: host
+    volumes:
+      - /home/coresense/SAMXL/coresense-ws/src/coresense-description/urdf:/home/ros/urdf
     ipc: host
     command: /bin/bash -c 'source install/setup.bash && ros2 launch aruco_pose_estimation pose_estimation_client.launch.xml'
     
