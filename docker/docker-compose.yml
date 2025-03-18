@@ -1,3 +1,5 @@
+name: erf_demo
+
 services:
   pose_estimation-server:
     container_name: pose_estimation-server

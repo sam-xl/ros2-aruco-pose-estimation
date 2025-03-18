@@ -9,8 +9,8 @@
     <xacro:include filename="$(find cell_description)/urdf/cell_description_macro.xacro" />
 
         
-    <xacro:cell_description_macro parent="rs" child="aruco_marker" add_parent="false">
-        <origin xyz="0.213 -0.188 0.807" rpy="-3.111 1.001 -1.514" />  
+    <xacro:cell_description_macro parent="ur10e_base_link" child="aruco_marker" add_parent="false">
+        <origin xyz="-0.687 -0.403 -0.042" rpy="0.034 0.026 -0.007" />  
     </xacro:cell_description_macro>
 
     <xacro:arg name="ridgeback_arm_height" default="$(optenv RIDGEBACK_ARM_HEIGHT 0.6)" />

@@ -1,3 +1,5 @@
+name: erf_demo
+
 services:
   pose_estimation-server:
     extends:
@@ -16,7 +18,14 @@ services:
       - ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}
     network_mode: host
     volumes:
-      - /home/coresense/SAMXL/coresense-ws/src/coresense-description/urdf:/home/ros/urdf
+      # For real pose estimation
+      # - /home/coresense/SAMXL/coresense-ws/src/coresense-description/urdf/coby_env.xacro:/home/ros/urdf/coby_env.xacro  
+      
+      # For testing (also default behaviour)
+      - ${POSE_EST_SRC_DIR}/aruco_pose_estimation/test/coby_env.xacro:/home/ros/urdf/coby_env.xacro 
+
+      # so you can modify launch file at host during testing
+      - ${POSE_EST_SRC_DIR}/aruco_pose_estimation/launch:/home/ros/target_ws/install/aruco_pose_estimation/share/aruco_pose_estimation/launch
     ipc: host
     command: /bin/bash -c 'source install/setup.bash && ros2 launch aruco_pose_estimation pose_estimation_client.launch.xml'
     
