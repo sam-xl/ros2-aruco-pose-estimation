@@ -1,5 +1,6 @@
 services:
   pose_estimation-server:
+    container_name: pose_estimation-server
     build:
       context: ${POSE_EST_SRC_DIR}
       dockerfile: docker/Dockerfile
