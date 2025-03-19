@@ -19,7 +19,7 @@ services:
     network_mode: host
     volumes:
       # For real pose estimation
-      - /home/coresense/SAMXL/coresense-ws/src/coresense-description/urdf/coby_env.xacro:/home/ros/urdf/coby_env.xacro  
+      - /home/coresense/workspaces/erf_ws/tmp/inspection-sm/deps_ws_cache/src/coresense-ridgeback-ur10e-description/urdf/coby_env.xacro:/home/ros/urdf/coby_env.xacro  
       
       # For testing (also default behaviour)
       # - ${POSE_EST_SRC_DIR}/aruco_pose_estimation/test/coby_env.xacro:/home/ros/urdf/coby_env.xacro 
