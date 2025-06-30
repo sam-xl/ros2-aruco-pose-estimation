@@ -1,0 +1,5 @@
+services:
+  aruco_pose_estimation_server:
+    extends:
+      file: services/aruco_pose_estimation_server/compose.yaml
+      service: aruco_pose_estimation_server
