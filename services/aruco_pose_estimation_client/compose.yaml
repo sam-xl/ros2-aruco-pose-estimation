@@ -1,0 +1,13 @@
+services:
+  aruco_pose_estimation_client:
+    image: aruco_pose_estimation:latest # build by the other service
+
+    # use the host network
+    network_mode: host
+    ipc: host
+
+    command: >
+      bash -c "
+        source /workspace/install/setup.bash &&
+        exec ros2 launch aruco_pose_estimation pose_estimation_client.launch.xml update_xacro:=true xacro_path:=/home/ros/urdf/coby_env.xacro parent_frame_id:=ur10e_base_link child_frame_id:=aruco_marker estimate_pose_srv:=/estimate_pos
+      "
