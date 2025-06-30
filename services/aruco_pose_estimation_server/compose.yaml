@@ -1,0 +1,17 @@
+services:
+  aruco_pose_estimation_server:
+    build:
+      context: ../../
+      dockerfile: services/aruco_pose_estimation_server/Dockerfile
+    image: aruco_pose_estimation:latest
+    env_file:
+      - .env
+    # use the host network
+    network_mode: host
+    ipc: host
+
+    command: >
+      bash -c "
+        source /workspace/install/setup.bash &&
+        exec ros2 launch aruco_pose_estimation erf_demo.launch.xml image_topic:=${IMAGE_TOPIC} camera_frame:=${CAMERA_FRAME} tool_frame:=${TOOL_FRAME}
+      "
