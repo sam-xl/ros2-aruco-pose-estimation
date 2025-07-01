@@ -13,5 +13,5 @@ services:
     command: >
       bash -c "
         source /workspace/install/setup.bash &&
-        exec ros2 launch aruco_pose_estimation erf_demo.launch.xml image_topic:=${IMAGE_TOPIC} camera_frame:=${CAMERA_FRAME} tool_frame:=${TOOL_FRAME}
+        exec ros2 launch aruco_pose_estimation erf_demo.launch.xml image_topic:=$${IMAGE_TOPIC} camera_frame:=$${CAMERA_FRAME} tool_frame:=$${TOOL_FRAME}
       "
