@@ -18,6 +18,7 @@
     </node>
 
     <!-- TF: tool-> camera. Using eye in hand calibration from easy_handeye2 package -->
+    <!-- Use in combination with publish_tf:=False when launching the realsense_ros2_camera node to avoid conflicts -->
     <node name="static_transform_publisher" pkg="tf2_ros" exec="static_transform_publisher" args="--frame-id $(var tool_frame) --child-frame-id $(var camera_frame) --x 0.014 --y 0.120 --z 0.019 --qx 0.006 --qy 0.708 --qz 0.706 --qw -0.009"/> 
 
 </launch>
