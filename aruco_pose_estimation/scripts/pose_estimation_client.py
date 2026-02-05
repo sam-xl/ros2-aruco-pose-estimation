@@ -20,41 +20,25 @@ class PoseEstimationClient(Node):
         self.declare_parameter('parent_frame_id', 'camera_link')
         self.declare_parameter('child_frame_id', 'aruco_marker')
         self.declare_parameter('publish_tf', False)
-        self.declare_parameter('update_xacro', True)
-        self.declare_parameter('xacro_path', "")
          
         self._client = self.make_srv_client('estimate_pose_srv', EstimatePose, required=True)
         self.run()
         self.logger.info("Done.")
-        self.destroy_node()
-        exit(0)
 
     def run(self):
         parent_frame_id = self.get_parameter("parent_frame_id").value
         child_frame_id = self.get_parameter("child_frame_id").value
         publish_tf = self.get_parameter("publish_tf").value
-        update_xacro = self.get_parameter("update_xacro").value
 
         response = self.estimate_pose(parent_frame_id, child_frame_id, publish_tf)
         if not response.success:
-            self.logger.error("Pose estimation failed. Skipping xacro update")
-            update_xacro = False    
+            self.logger.error("Pose estimation failed.")
         else:
             self.logger.info("Pose estimation successful.")
             xyz, rpy = self.transform_to_pose(response.transform.transform)
             self.logger.info(f"Translation [xyz, metres]: {xyz}")
             self.logger.info(f"Rotation [rpy, radians]: {rpy}")
-
-        if update_xacro:
-            xacro_path = self.get_parameter("xacro_path").get_parameter_value().string_value
-            self.logger.info(f"Updating xacro path: {xacro_path}")
-            try:
-                if not os.path.exists(xacro_path):
-                    raise FileNotFoundError
-                self.update_xacro(response.transform, xacro_path)
-            except Exception as e:
-                self.logger.error(f"Xacro update failed. Error: {e}")
-
+            return
 
     def make_srv_client(self, srv_name, srv_type, required=True):
         """Help in creating and handling service clients."""
@@ -81,12 +65,6 @@ class PoseEstimationClient(Node):
         response = future.result()
 
         return response
-    
-    def update_xacro(self, transform, xacro_path):
-        tree, cell_description = self.get_cell_description(xacro_path)
-        
-        self.update_cell_description(cell_description, transform)
-        tree.write(xacro_path)
 
     @staticmethod
     def transform_to_pose(transform):
@@ -95,35 +73,6 @@ class PoseEstimationClient(Node):
         rpy = Rotation.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler('xyz')
         return xyz, rpy
 
-    def update_cell_description(self, cell_description, transform):
-        cell_description.attrib["parent"] = transform.header.frame_id
-        cell_description.attrib["child"] = transform.child_frame_id
-
-        xyz, rpy = self.transform_to_pose(transform.transform)
-
-        origin = cell_description.find('origin')        
-        origin.attrib['xyz'] = f"{xyz.x:0.3f} {xyz.y:0.3f} {xyz.z:0.3f}"
-        origin.attrib['rpy'] = f"{rpy[0]:0.3f} {rpy[1]:0.3f} {rpy[2]:0.3f}"
-
-    @staticmethod
-    def get_cell_description(xacro_path) -> ET.Element:
-        """Get the cell description macro element from the xacro
-
-        Args:
-            xacro_path (str): path to the xacro file
-
-        Returns:
-            ET.ElementTree: The original element tree. Need it for writing out
-            ET.Element: The element to be modified using pose estimation
-        """
-        # need to do this otherwise the default ns0 namespace is used
-        ET.register_namespace('xacro', "http://wiki.ros.org/xacro")
-        tree = ET.parse(xacro_path)
-        robot = tree.getroot()
-        cell_description_macro = robot.find('{http://wiki.ros.org/xacro}cell_description_macro')
-
-        return tree, cell_description_macro
-    
 
 def main(args=None):
     """Launch the ROS node.
@@ -133,8 +82,9 @@ def main(args=None):
     """
     rclpy.init(args=args)
     node = PoseEstimationClient("pose_estimation_client")
-    rclpy.spin(node)
+    rclpy.spin_once(node)
+    node.destroy_node()
     rclpy.shutdown()
-
+    
 if __name__ == "__main__":
     main()

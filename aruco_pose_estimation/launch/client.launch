@@ -1,7 +1,5 @@
 <launch>
     <node name="pose_estimation_client" pkg="aruco_pose_estimation" exec="pose_estimation_client.py" output="screen">
-        <param name="update_xacro" value="true"/>
-        <param name="xacro_path" value="/home/ros/urdf/coby_env.xacro"/>
         <param name="parent_frame_id" value="ur10e_base_link"/>
         <param name="child_frame_id" value="aruco_marker"/>
         <param name="publish_tf" value="true"/>
