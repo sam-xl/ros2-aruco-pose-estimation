@@ -4,6 +4,7 @@
         <param name="xacro_path" value="/home/ros/urdf/coby_env.xacro"/>
         <param name="parent_frame_id" value="ur10e_base_link"/>
         <param name="child_frame_id" value="aruco_marker"/>
+        <param name="publish_tf" value="true"/>
         <remap from="estimate_pose_srv" to="/estimate_pose"/>
     </node>
 </launch>
