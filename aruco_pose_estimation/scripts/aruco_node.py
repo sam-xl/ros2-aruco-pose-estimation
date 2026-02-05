@@ -386,11 +386,7 @@ class ArucoNode(rclpy.node.Node):
                 T_marker_cam.transform.rotation.z = pose_array.poses[0].orientation.z
                 T_marker_cam.transform.rotation.w = pose_array.poses[0].orientation.w
                 
-                if request.publish_tf:
-                    self.tf_broadcaster.sendTransform(T_marker_cam)
-
-                # TODO change hardcoded rs. Currently done because frame name in urdf doesn't match self.camera_frame                
-                T_cam_base =  self.tf_buffer.lookup_transform(request.parent_frame_id, "rs" , rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
+                T_cam_base =  self.tf_buffer.lookup_transform(request.parent_frame_id, self.camera_frame, rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
                 mat_marker_base = _transform_to_affine(T_cam_base)@_transform_to_affine(T_marker_cam) # marker with respect to base link
                 
                 # get transform from matrix
@@ -407,6 +403,9 @@ class ArucoNode(rclpy.node.Node):
                 T_marker_base.transform.rotation.y = orientation[2]
                 T_marker_base.transform.rotation.z = orientation[3]
                 T_marker_base.transform.rotation.w = orientation[0]
+
+                if request.publish_tf:
+                    self.tf_broadcaster.sendTransform(T_marker_base)
 
                 response.success = True
                 response.transform = T_marker_base
