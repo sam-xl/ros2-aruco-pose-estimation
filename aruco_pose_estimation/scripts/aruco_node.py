@@ -129,13 +129,13 @@ class ArucoNode(rclpy.node.Node):
         self.distortion = None
 
         # code for updated version of cv2 (4.7.0)
-        self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
-        self.aruco_parameters = cv2.aruco.DetectorParameters()
-        self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dictionary, self.aruco_parameters)
+        # self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+        # self.aruco_parameters = cv2.aruco.DetectorParameters()
+        # self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dictionary, self.aruco_parameters)
 
         # old code version
-        # self.aruco_dictionary = cv2.aruco.Dictionary_get(dictionary_id)
-        # self.aruco_parameters = cv2.aruco.DetectorParameters_create()
+        self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+        self.aruco_parameters = cv2.aruco.DetectorParameters_create()
 
         rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 10)
         if not self.future_rcv_image.done():
@@ -197,7 +197,8 @@ class ArucoNode(rclpy.node.Node):
 
         # call the pose estimation function
         frame, pose_array, markers = pose_estimation(rgb_frame=cv_image, depth_frame=cv_depth_image,
-                                                     aruco_detector=self.aruco_detector,
+                                                     aruco_dict=self.aruco_dictionary,
+                                                     aruco_params=self.aruco_parameters,
                                                      marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
                                                      distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
 
@@ -366,7 +367,8 @@ class ArucoNode(rclpy.node.Node):
 
         try:
             frame, pose_array, markers = pose_estimation(rgb_frame=self.cv_image, depth_frame=None,
-                                                     aruco_detector=self.aruco_detector,
+                                                     aruco_dict=self.aruco_dictionary,
+                                                     aruco_params=self.aruco_parameters,
                                                      marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
                                                      distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
             # Return the first pose as the transform
