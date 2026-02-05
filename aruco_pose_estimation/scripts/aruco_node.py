@@ -374,7 +374,7 @@ class ArucoNode(rclpy.node.Node):
             # Return the first pose as the transform
             if len(markers.marker_ids)>0:
                 T_marker_cam.header.stamp = self.get_clock().now().to_msg()
-                T_marker_cam.header.frame_id = "rs"
+                T_marker_cam.header.frame_id = self.camera_frame
                 T_marker_cam.child_frame_id = request.child_frame_id
 
                 T_marker_cam.transform.translation.x = pose_array.poses[0].position.x
