@@ -119,9 +119,9 @@ class ArucoNode(rclpy.node.Node):
             )
 
         # Set up publishers
-        # self.poses_pub = self.create_publisher(PoseArray, self.markers_visualization_topic, 10)
-        # self.markers_pub = self.create_publisher(ArucoMarkers, self.detected_markers_topic, 10)
-        # self.image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+        self.poses_pub = self.create_publisher(PoseArray, self.markers_visualization_topic, 10)
+        self.markers_pub = self.create_publisher(ArucoMarkers, self.detected_markers_topic, 10)
+        self.image_pub = self.create_publisher(Image, self.output_image_topic, 10)
 
         # Set up fields for camera parameters
         self.info_msg = None
@@ -409,6 +409,15 @@ class ArucoNode(rclpy.node.Node):
 
                 response.success = True
                 response.transform = T_marker_base
+
+                # debug information
+
+                # Publish the results with the poses and markes positions
+                self.poses_pub.publish(pose_array)
+                self.markers_pub.publish(markers)
+
+                # publish the image frame with computed markers positions over the image
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
             else:
                 raise ValueError("Pose array is empty")
         except Exception as e:
