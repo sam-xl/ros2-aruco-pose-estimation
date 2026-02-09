@@ -14,7 +14,7 @@ available at [ros2_intel_realsense](https://github.com/IntelRealSense/realsense-
 different cameras, provided a proper calibration of the camera parameters.
 
 ### Building
-To build from source, clone the lastest version from this repository into your workspace:
+To build from source, clone the latest version from this repository into your workspace:
 
 ```bash
 cd ros_ws/src
@@ -77,7 +77,7 @@ sudo apt-get install ros-jazzy-image-publisher
 
 ros2 run image_publisher image_publisher_node /path/to/ros2-aruco-pose-estimation/aruco_pose_estimation/test/test.jpeg --ros-args -r image_raw:=/camera/camera/color/image_raw -p frame_id:=camera_color_optical_frame -p camera_info_url:=file:///workspace/src/ros2-aruco-pose-estimation/aruco_pose_estimation/config/calibration_realsense.yaml
 ```
-The `camera_info_url` must be a file:// url to a yaml calibration file (Usually received via tha [camera_calibration](https://docs.ros.org/en/jazzy/p/camera_calibration/doc/index.html) package). 
+The `camera_info_url` must be a file:// url to a yaml calibration file (Usually received via the [camera_calibration](https://docs.ros.org/en/jazzy/p/camera_calibration/doc/index.html) package). 
 
 3. Run the server
 ```
@@ -86,7 +86,7 @@ ros2 launch aruco_pose_estimation server.launch
 
 4. Call the client via cli. 
 ```
-ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, parent_frame_id: camera_color_optical_frame, child_frame_id: aruco_marker}
+ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, base_frame_id: camera_color_optical_frame, marker_frame_id: aruco_marker}
 ```
 
 You should see the response at the command line:

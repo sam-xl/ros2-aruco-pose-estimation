@@ -375,7 +375,7 @@ class ArucoNode(rclpy.node.Node):
             if len(markers.marker_ids)>0:
                 T_marker_cam.header.stamp = self.get_clock().now().to_msg()
                 T_marker_cam.header.frame_id = self.camera_frame
-                T_marker_cam.child_frame_id = request.child_frame_id
+                T_marker_cam.child_frame_id = request.marker_frame_id
 
                 T_marker_cam.transform.translation.x = pose_array.poses[0].position.x
                 T_marker_cam.transform.translation.y = pose_array.poses[0].position.y
@@ -386,13 +386,13 @@ class ArucoNode(rclpy.node.Node):
                 T_marker_cam.transform.rotation.z = pose_array.poses[0].orientation.z
                 T_marker_cam.transform.rotation.w = pose_array.poses[0].orientation.w
                 
-                T_cam_base =  self.tf_buffer.lookup_transform(request.parent_frame_id, self.camera_frame, rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
+                T_cam_base =  self.tf_buffer.lookup_transform(request.base_frame_id, self.camera_frame, rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
                 mat_marker_base = _transform_to_affine(T_cam_base)@_transform_to_affine(T_marker_cam) # marker with respect to base link
                 
                 # get transform from matrix
                 T_marker_base = TransformStamped()
-                T_marker_base.header.frame_id = request.parent_frame_id
-                T_marker_base.child_frame_id = request.child_frame_id
+                T_marker_base.header.frame_id = request.base_frame_id
+                T_marker_base.child_frame_id = request.marker_frame_id
 
                 orientation, position = _decompose_affine(mat_marker_base)
                 T_marker_base.transform.translation.x = position[0]
