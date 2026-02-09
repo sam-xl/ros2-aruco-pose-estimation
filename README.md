@@ -75,7 +75,7 @@ You can also test this package by simulating a camera topic via an image publish
 ```
 sudo apt-get install ros-jazzy-image-publisher
 
-ros2 run image_publisher image_publisher_node /path/to/ros2-aruco-pose-estimation/aruco_pose_estimation/test/test.jpeg --ros-args -r image_raw:=/camera/camera/color/image_raw -p frame_id:=camera_color_optical_frame -p camera_info_url:=file:///workspace/src/ros2-aruco-pose-estimation/aruco_pose_estimation/test/rs_calibration.yaml
+ros2 run image_publisher image_publisher_node /path/to/ros2-aruco-pose-estimation/aruco_pose_estimation/test/test.jpeg --ros-args -r image_raw:=/camera/camera/color/image_raw -p frame_id:=camera_color_optical_frame -p camera_info_url:=file:///workspace/src/ros2-aruco-pose-estimation/aruco_pose_estimation/config/calibration_realsense.yaml
 ```
 The `camera_info_url` must be a file:// url to a yaml calibration file (Usually received via tha [camera_calibration](https://docs.ros.org/en/jazzy/p/camera_calibration/doc/index.html) package). 
 
