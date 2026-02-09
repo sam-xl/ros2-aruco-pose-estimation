@@ -353,7 +353,15 @@ class ArucoNode(rclpy.node.Node):
         )
 
     def estimate_pose_callback(self, request, response):
-
+        if self.info_msg is None:
+            self.get_logger().error("Camera info not yet received")
+            response.success = False
+            return response
+        if not hasattr(self, 'cv_image'):
+            self.get_logger().error("No image received yet")
+            response.success = False
+            return response
+            
         markers = ArucoMarkers()
         pose_array = PoseArray()
         if self.camera_frame == "":
