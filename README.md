@@ -61,7 +61,7 @@ This launch file brings up the pose estimation server and publishes a static tra
 
 See the server.launch file to see other default values. For example we use the `DICT_ARUCO_ORIGINAL` for aruco detection.
 
-Run the example client file (or run call the server via cli)
+Call the server from command line
 ```bash
 ros2 service call /estimate_pose Est "{publish_tf: true, base_frame_id: camera_link, marker_frame_id: aruco_marker}"
 ```
@@ -99,8 +99,6 @@ You can also open rviz2 and visualize the transforms
 
 ## Launch files
 * **`server.launch`**: Runs a pose estimation server and creates a static transform between the tool frame and camera frame (created using hand-eye calibration)
-
-* **`client.launch`**: Runs an example client and outputs the transform
 
 ## Nodes
 
