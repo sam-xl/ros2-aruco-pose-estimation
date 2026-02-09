@@ -1,9 +1,10 @@
 ## Aruco pose estimation server
 
+![](<rviz.png>)
 ## Overview
 This repository hosts a server that uses a 2D vision camera and aruco markers to estimate the pose of an object.
 
-This package hase been developed and tested under ros2 jazzy and UBuntu 24.04.
+This package has been developed and tested under ROS2 Jazzy and Ubuntu 24.04.
 
 ## Installation
 
@@ -51,7 +52,7 @@ Run the pose estimation server.
 ros2 launch aruco_pose_estimation server.launch
 ```
 
-This launch file bringups the pose estimation server and publishes a static transform between the tool end effector and the camera frame. This transform is obtained from a calibration package such as easy_handeye2.
+This launch file brings up the pose estimation server and publishes a static transform between the tool end effector and the camera frame. This transform is obtained from a calibration package such as easy_handeye2.
 
 - `image_topic`: The image topic which can see the aruco marker. 
 - `camera_frame`: The child frame for the calibrated transform.
@@ -62,8 +63,38 @@ See the server.launch file to see other default values. For example we use the `
 
 Run the example client file (or run call the server via cli)
 ```bash
-ros2 launch aruco_pose_estimation client.launch
+ros2 service call /estimate_pose Est "{publish_tf: true, base_frame_id: camera_link, marker_frame_id: aruco_marker}"
 ```
+
+## Test
+You can also test this package by simulating a camera topic via an image publisher.
+
+1. First build the package as usual.
+
+2. Install and run the image publisher
+```
+sudo apt-get install ros-jazzy-image-publisher
+
+ros2 run image_publisher image_publisher_node /path/to/ros2-aruco-pose-estimation/aruco_pose_estimation/test/test.jpeg --ros-args -r image_raw:=/camera/camera/color/image_raw -p frame_id:=camera_color_optical_frame -p camera_info_url:=file:///workspace/src/ros2-aruco-pose-estimation/aruco_pose_estimation/test/rs_calibration.yaml
+```
+The `camera_info_url` must be a file:// url to a yaml calibration file (Usually received via tha [camera_calibration](https://docs.ros.org/en/jazzy/p/camera_calibration/doc/index.html) package). 
+
+3. Run the server
+```
+ros2 launch aruco_pose_estimation server.launch
+```
+
+4. Call the client via cli. 
+```
+ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, parent_frame_id: camera_color_optical_frame, child_frame_id: aruco_marker}
+```
+
+You should see the response at the command line:
+```
+response:
+aruco_interfaces.srv.EstimatePose_Response(success=True, transform=geometry_msgs.msg.TransformStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='camera_color_optical_frame'), child_frame_id='aruco_marker', transform=geometry_msgs.msg.Transform(translation=geometry_msgs.msg.Vector3(x=0.2350243668497091, y=0.18597054586065426, z=1.773531881051882), rotation=geometry_msgs.msg.Quaternion(x=-0.48846404608166666, y=-0.36208421527813195, z=0.13023803578360288, w=0.7831576793770051))))
+```
+You can also open rviz2 and visualize the transforms
 
 
 ## Launch files
@@ -74,7 +105,7 @@ ros2 launch aruco_pose_estimation client.launch
 ## Nodes
 
 ### `aruco_node`
-This node exposes a pose estimation server at `/estimat_pose`
+This node exposes a pose estimation server at `/estimate_pose`
 
 #### Parameters 
 
@@ -90,8 +121,9 @@ This node exposes a pose estimation server at `/estimat_pose`
 * `output_image_topic` - Topic to publish the output image with detected markers drawn on it, for visualization purposes
 
 #### Published Topics
-* `/topic_name` ([message/type](link/to/msg/file))\
-TODO: Add description ...
+* `/aruco/poses`: Poses of all detected markers, suitable for rviz visualization - (`geometry_msgs.msg.PoseArray`) - 
+* `/aruco/markers`: Provides an array of all poses along with the corresponding marker ids - (`aruco_interfaces.msg.ArucoMarkers`)
+* `/aruco/image`: Output image with detected markers drawn on it, for visualization purposes - (`sensor_msgs.msg.Image`)
 
 #### Subscribed Topics
 * `/camera/image_raw`: RGB image input (`sensor_msgs.msg.Image`)
@@ -112,10 +144,3 @@ _Response_
 
 success (`bool`): If the pose estimation was successful
 transform (`geometry_msgs/TransformStamped`): The resulting transform between base and marker
-
-
-## Detailed Documentation
-Other than the brief introduction in this page, you can also check the detailed documentation [here](./docs/).
-
-## Bugs & Feature Requests
-Please report bugs and request features using the [Issue Tracker](<PACKAGE_ISSUE_URL>).

@@ -32,7 +32,7 @@ Build the package from source with `colcon build --symlink-install` in the works
 
 ## Aruco Pose Detection and Estimation ROS2 nodes description
 
-This node subscribes to the RGB and optionally Depth images from the camera, and the camera inof topic for
+This node subscribes to the RGB and optionally Depth images from the camera, and the camera info topic for
 intrinsic and distortion parameters. It detects Aruco markers in the RGB image, and estimates their poses using the
 camera intrinsic parameters or the depth image. The poses are published as PoseArray message, and the detected markers
 are published as ArucoMarkers messages. The output image contains the detected markers and aruco bounding boxes drawn on it.
