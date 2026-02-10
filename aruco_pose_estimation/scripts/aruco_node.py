@@ -80,7 +80,8 @@ class ArucoNode(rclpy.node.Node):
             self.get_logger().error("valid options: {}".format(options))
 
         # Set up subscriptions to the camera info and camera image topics
-        self.future_rcv_image = rclpy.Future()  # this future is used to sync the service
+        self.future_rcv_image = rclpy.Future()  # this future is used to sync the image
+        self.future_rcv_info = rclpy.Future()  # this future is used to sync the camera info
 
         self.bridge = CvBridge()
 
@@ -88,6 +89,7 @@ class ArucoNode(rclpy.node.Node):
         self.info_sub = self.create_subscription(
             CameraInfo, self.info_topic, self.info_callback, qos_profile_sensor_data
         )
+        
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -137,6 +139,14 @@ class ArucoNode(rclpy.node.Node):
         self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
         self.aruco_parameters = cv2.aruco.DetectorParameters_create()
 
+        # wait until camera info comes in
+        rclpy.spin_until_future_complete(self, future=self.future_rcv_info, timeout_sec = 10)
+        if not self.future_rcv_info.done():
+            raise TimeoutError(
+                f"Timed out waiting for image on topic: {self.info_topic}. \n Check if: The image is being publised on the correct topic and namespace."
+            )
+
+        # wait until camera image comes in
         rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 10)
         if not self.future_rcv_image.done():
             raise TimeoutError(
@@ -159,6 +169,9 @@ class ArucoNode(rclpy.node.Node):
         # Assume that camera parameters will remain the same...
         self.destroy_subscription(self.info_sub)
 
+        if not self.future_rcv_info.done():
+            self.future_rcv_info.set_result(None) # this future is used to sync the service
+
     def image_callback(self, img_msg: Image):
         if self.info_msg is None:
             self.get_logger().warn("No camera info has been received!")
@@ -167,7 +180,8 @@ class ArucoNode(rclpy.node.Node):
         # convert the image messages to cv2 format
         self.cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
         
-        self.future_rcv_image.set_result(None) # this future is used to sync the service
+        if not self.future_rcv_image.done():
+            self.future_rcv_image.set_result(None) # this future is used to sync the service
 
     def depth_image_callback(self, depth_msg: Image):
         if self.info_msg is None:
