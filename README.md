@@ -63,7 +63,7 @@ See the server.launch file to see other default values. For example we use the `
 
 Call the server from command line
 ```bash
-ros2 service call /estimate_pose Est "{publish_tf: true, base_frame_id: camera_link, marker_frame_id: aruco_marker}"
+ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, base_frame_id: camera_link, marker_frame_id: aruco_marker}"
 ```
 
 ## Test
