@@ -86,7 +86,7 @@ ros2 launch aruco_pose_estimation server.launch
 
 4. Call the client via cli. 
 ```
-ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, base_frame_id: camera_color_optical_frame, marker_frame_id: aruco_marker}
+ros2 service call /estimate_pose aruco_interfaces/srv/EstimatePose "{publish_tf: true, base_frame_id: camera_color_optical_frame, marker_frame_id: aruco_marker}"
 ```
 
 You should see the response at the command line:
