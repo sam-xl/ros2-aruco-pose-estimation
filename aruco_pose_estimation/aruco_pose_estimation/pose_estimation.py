@@ -42,7 +42,7 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
     # corners, marker_ids, _ = cv2.aruco.detectMarkers(frame, aruco_dict_type, parameters=parameters)
 
     # new code version
-    corners, marker_ids, rejected = cv2.aruco.detectMarkers(image=rgb_frame, dictionary=aruco_dict, parameters=aruco_params)
+    corners, marker_ids, _ = cv2.aruco.detectMarkers(image=rgb_frame, dictionary=aruco_dict, parameters=aruco_params)
 
     frame_processed = rgb_frame
     logger = rcutils_logger.RcutilsLogger(name="aruco_node")
