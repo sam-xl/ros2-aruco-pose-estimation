@@ -20,7 +20,7 @@ from aruco_interfaces.msg import ArucoMarkers
 from aruco_pose_estimation.utils import aruco_display
 
 
-def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_detector: cv2.aruco.ArucoDetector, marker_size: float,
+def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruco_params, marker_size: float,
                     matrix_coefficients: np.array, distortion_coefficients: np.array,
                     pose_array: PoseArray, markers: ArucoMarkers) -> list[np.array, PoseArray, ArucoMarkers]:
     '''
@@ -42,7 +42,7 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_detector: 
     # corners, marker_ids, _ = cv2.aruco.detectMarkers(frame, aruco_dict_type, parameters=parameters)
 
     # new code version
-    corners, marker_ids, rejected = aruco_detector.detectMarkers(image=rgb_frame)
+    corners, marker_ids, _ = cv2.aruco.detectMarkers(image=rgb_frame, dictionary=aruco_dict, parameters=aruco_params)
 
     frame_processed = rgb_frame
     logger = rcutils_logger.RcutilsLogger(name="aruco_node")

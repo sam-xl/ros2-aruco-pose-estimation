@@ -32,7 +32,7 @@ install(PROGRAMS
 
 # Install directories
 install(DIRECTORY
-    launch rviz config
+    launch rviz config test
     DESTINATION share/${PROJECT_NAME}
 )
 ament_package()

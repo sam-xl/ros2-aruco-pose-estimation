@@ -1,0 +1,6 @@
+bool publish_tf false   # publish the transform once
+string base_frame_id 'camera_link'    # the transform is with respect to this frame id
+string marker_frame_id 'aruco_marker'    # the transform is created with this frame id
+---
+bool success
+geometry_msgs/TransformStamped transform

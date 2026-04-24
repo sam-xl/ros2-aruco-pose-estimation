@@ -38,7 +38,6 @@ Version: 2024-01-29
 # ROS2 imports
 import rclpy
 import rclpy.node
-from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
 import message_filters
 
@@ -53,10 +52,13 @@ from aruco_pose_estimation.pose_estimation import pose_estimation
 # ROS2 message imports
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import PoseArray, TransformStamped
 from aruco_interfaces.msg import ArucoMarkers
+from aruco_interfaces.srv import EstimatePose
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy, QoSHistoryPolicy
+from rclpy.qos import qos_profile_sensor_data, QoSHistoryPolicy, QoSProfile
+from tf2_ros import TransformBroadcaster, TransformListener, Buffer
+from tf2_geometry_msgs.tf2_geometry_msgs import _decompose_affine, _transform_to_affine
 
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
@@ -78,11 +80,20 @@ class ArucoNode(rclpy.node.Node):
             self.get_logger().error("valid options: {}".format(options))
 
         # Set up subscriptions to the camera info and camera image topics
+        self.future_rcv_image = rclpy.Future()  # this future is used to sync the image
+        self.future_rcv_info = rclpy.Future()  # this future is used to sync the camera info
+
+        self.bridge = CvBridge()
 
         # camera info topic for the camera calibration parameters
         self.info_sub = self.create_subscription(
             CameraInfo, self.info_topic, self.info_callback, qos_profile_sensor_data
         )
+        
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # select the type of input to use for the pose estimation
         if (bool(self.use_depth_input)):
@@ -90,7 +101,7 @@ class ArucoNode(rclpy.node.Node):
 
             # create a message filter to synchronize the image and depth image topics
             self.image_sub = message_filters.Subscriber(self, Image, self.image_topic,
-                                                        qos_profile=qos_profile_sensor_data)
+                                                        qos_profile=QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=1))
             self.depth_image_sub = message_filters.Subscriber(self, Image, self.depth_image_topic,
                                                               qos_profile=QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=1))
 
@@ -120,15 +131,29 @@ class ArucoNode(rclpy.node.Node):
         self.distortion = None
 
         # code for updated version of cv2 (4.7.0)
-        self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
-        self.aruco_parameters = cv2.aruco.DetectorParameters()
-        self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dictionary, self.aruco_parameters)
+        # self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+        # self.aruco_parameters = cv2.aruco.DetectorParameters()
+        # self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dictionary, self.aruco_parameters)
 
         # old code version
-        # self.aruco_dictionary = cv2.aruco.Dictionary_get(dictionary_id)
-        # self.aruco_parameters = cv2.aruco.DetectorParameters_create()
+        self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+        self.aruco_parameters = cv2.aruco.DetectorParameters_create()
 
-        self.bridge = CvBridge()
+        # wait until camera info comes in
+        rclpy.spin_until_future_complete(self, future=self.future_rcv_info, timeout_sec = 10)
+        if not self.future_rcv_info.done():
+            raise TimeoutError(
+                f"Timed out waiting for image on topic: {self.info_topic}. \n Check if: The image is being publised on the correct topic and namespace."
+            )
+
+        # wait until camera image comes in
+        rclpy.spin_until_future_complete(self, future=self.future_rcv_image, timeout_sec = 10)
+        if not self.future_rcv_image.done():
+            raise TimeoutError(
+                f"Timed out waiting for image on topic: {self.image_topic}. \n Check if: The image is being publised on the correct topic and namespace."
+            )
+
+        self.estimate_pose_server = self.create_service(EstimatePose, "/estimate_pose", self.estimate_pose_callback)
 
     def info_callback(self, info_msg):
         self.info_msg = info_msg
@@ -144,51 +169,19 @@ class ArucoNode(rclpy.node.Node):
         # Assume that camera parameters will remain the same...
         self.destroy_subscription(self.info_sub)
 
+        if not self.future_rcv_info.done():
+            self.future_rcv_info.set_result(None) # this future is used to sync the service
+
     def image_callback(self, img_msg: Image):
         if self.info_msg is None:
             self.get_logger().warn("No camera info has been received!")
             return
 
         # convert the image messages to cv2 format
-        cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
-
-        # create the ArucoMarkers and PoseArray messages
-        markers = ArucoMarkers()
-        pose_array = PoseArray()
-
-        # Set the frame id and timestamp for the markers and pose array
-        if self.camera_frame == "":
-            markers.header.frame_id = self.info_msg.header.frame_id
-            pose_array.header.frame_id = self.info_msg.header.frame_id
-        else:
-            markers.header.frame_id = self.camera_frame
-            pose_array.header.frame_id = self.camera_frame
-
-        markers.header.stamp = img_msg.header.stamp
-        pose_array.header.stamp = img_msg.header.stamp
-
-        """
-        # OVERRIDE: use calibrated intrinsic matrix and distortion coefficients
-        self.intrinsic_mat = np.reshape([615.95431, 0., 325.26983,
-                                         0., 617.92586, 257.57722,
-                                         0., 0., 1.], (3, 3))
-        self.distortion = np.array([0.142588, -0.311967, 0.003950, -0.006346, 0.000000])
-        """
+        self.cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
         
-        # call the pose estimation function
-        frame, pose_array, markers = pose_estimation(rgb_frame=cv_image, depth_frame=None,
-                                                     aruco_detector=self.aruco_detector,
-                                                     marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
-                                                     distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
-
-        # if some markers are detected
-        if len(markers.marker_ids) > 0:
-            # Publish the results with the poses and markes positions
-            self.poses_pub.publish(pose_array)
-            self.markers_pub.publish(markers)
-
-        # publish the image frame with computed markers positions over the image
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
+        if not self.future_rcv_image.done():
+            self.future_rcv_image.set_result(None) # this future is used to sync the service
 
     def depth_image_callback(self, depth_msg: Image):
         if self.info_msg is None:
@@ -218,7 +211,8 @@ class ArucoNode(rclpy.node.Node):
 
         # call the pose estimation function
         frame, pose_array, markers = pose_estimation(rgb_frame=cv_image, depth_frame=cv_depth_image,
-                                                     aruco_detector=self.aruco_detector,
+                                                     aruco_dict=self.aruco_dictionary,
+                                                     aruco_params=self.aruco_parameters,
                                                      marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
                                                      distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
 
@@ -372,7 +366,88 @@ class ArucoNode(rclpy.node.Node):
             self.get_parameter("output_image_topic").get_parameter_value().string_value
         )
 
+    def estimate_pose_callback(self, request, response):
+        if self.info_msg is None:
+            self.get_logger().error("Camera info not yet received")
+            response.success = False
+            return response
+        if not hasattr(self, 'cv_image'):
+            self.get_logger().error("No image received yet")
+            response.success = False
+            return response
+            
+        markers = ArucoMarkers()
+        pose_array = PoseArray()
+        if self.camera_frame == "":
+            markers.header.frame_id = self.info_msg.header.frame_id
+            pose_array.header.frame_id = self.info_msg.header.frame_id
+        else:
+            markers.header.frame_id = self.camera_frame
+            pose_array.header.frame_id = self.camera_frame
 
+        T_marker_cam = TransformStamped()
+
+        try:
+            frame, pose_array, markers = pose_estimation(rgb_frame=self.cv_image, depth_frame=None,
+                                                     aruco_dict=self.aruco_dictionary,
+                                                     aruco_params=self.aruco_parameters,
+                                                     marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
+                                                     distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
+            # Return the first pose as the transform
+            if len(markers.marker_ids)>0:
+                T_marker_cam.header.stamp = self.get_clock().now().to_msg()
+                T_marker_cam.header.frame_id = self.camera_frame
+                T_marker_cam.child_frame_id = request.marker_frame_id
+
+                T_marker_cam.transform.translation.x = pose_array.poses[0].position.x
+                T_marker_cam.transform.translation.y = pose_array.poses[0].position.y
+                T_marker_cam.transform.translation.z = pose_array.poses[0].position.z
+
+                T_marker_cam.transform.rotation.x = pose_array.poses[0].orientation.x
+                T_marker_cam.transform.rotation.y = pose_array.poses[0].orientation.y
+                T_marker_cam.transform.rotation.z = pose_array.poses[0].orientation.z
+                T_marker_cam.transform.rotation.w = pose_array.poses[0].orientation.w
+                
+                T_cam_base =  self.tf_buffer.lookup_transform(request.base_frame_id, self.camera_frame, rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
+                mat_marker_base = _transform_to_affine(T_cam_base)@_transform_to_affine(T_marker_cam) # marker with respect to base link
+                
+                # get transform from matrix
+                T_marker_base = TransformStamped()
+                T_marker_base.header.frame_id = request.base_frame_id
+                T_marker_base.child_frame_id = request.marker_frame_id
+
+                orientation, position = _decompose_affine(mat_marker_base)
+                T_marker_base.transform.translation.x = position[0]
+                T_marker_base.transform.translation.y = position[1]
+                T_marker_base.transform.translation.z = position[2]
+
+                T_marker_base.transform.rotation.x = orientation[1]
+                T_marker_base.transform.rotation.y = orientation[2]
+                T_marker_base.transform.rotation.z = orientation[3]
+                T_marker_base.transform.rotation.w = orientation[0]
+
+                if request.publish_tf:
+                    self.tf_broadcaster.sendTransform(T_marker_base)
+
+                response.success = True
+                response.transform = T_marker_base
+
+                # debug information
+
+                # Publish the results with the poses and markes positions
+                self.poses_pub.publish(pose_array)
+                self.markers_pub.publish(markers)
+
+                # publish the image frame with computed markers positions over the image
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
+            else:
+                raise ValueError("Pose array is empty")
+        except Exception as e:
+            self.get_logger().error(f"Error in pose estimation: {e}")
+            response.success = False
+    
+        return response
+    
 def main():
     rclpy.init()
     node = ArucoNode()
