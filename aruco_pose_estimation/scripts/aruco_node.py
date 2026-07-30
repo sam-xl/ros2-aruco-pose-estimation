@@ -179,9 +179,48 @@ class ArucoNode(rclpy.node.Node):
 
         # convert the image messages to cv2 format
         self.cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="rgb8")
-        
+
         if not self.future_rcv_image.done():
             self.future_rcv_image.set_result(None) # this future is used to sync the service
+
+        if self.continuous_detection:
+            self.rgb_detect_and_publish(img_msg.header.stamp)
+
+    def rgb_detect_and_publish(self, stamp):
+        # run the rgb-only pose estimation on the last received frame and publish the results
+        markers = ArucoMarkers()
+        pose_array = PoseArray()
+
+        if self.camera_frame == "":
+            markers.header.frame_id = self.info_msg.header.frame_id
+            pose_array.header.frame_id = self.info_msg.header.frame_id
+        else:
+            markers.header.frame_id = self.camera_frame
+            pose_array.header.frame_id = self.camera_frame
+
+        markers.header.stamp = stamp
+        pose_array.header.stamp = stamp
+
+        try:
+            frame, pose_array, markers = pose_estimation(rgb_frame=self.cv_image, depth_frame=None,
+                                                         aruco_dict=self.aruco_dictionary,
+                                                         aruco_params=self.aruco_parameters,
+                                                         marker_size=self.marker_size,
+                                                         matrix_coefficients=self.intrinsic_mat,
+                                                         distortion_coefficients=self.distortion,
+                                                         pose_array=pose_array, markers=markers)
+        except Exception as e:
+            # never let a bad frame kill the spin loop
+            self.get_logger().warn(f"Error in continuous pose estimation: {e}", throttle_duration_sec=5.0)
+            return
+
+        # if some markers are detected
+        if len(markers.marker_ids) > 0:
+            self.poses_pub.publish(pose_array)
+            self.markers_pub.publish(markers)
+
+        # publish the image frame with computed markers positions over the image
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame, "rgb8"))
 
     def depth_image_callback(self, depth_msg: Image):
         if self.info_msg is None:
@@ -251,6 +290,15 @@ class ArucoNode(rclpy.node.Node):
             descriptor=ParameterDescriptor(
                 type=ParameterType.PARAMETER_BOOL,
                 description="Use depth camera input for pose estimation instead of RGB image",
+            ),
+        )
+
+        self.declare_parameter(
+            name="continuous_detection",
+            value=False,
+            descriptor=ParameterDescriptor(
+                type=ParameterType.PARAMETER_BOOL,
+                description="Detect and publish on every RGB frame instead of only on /estimate_pose calls",
             ),
         )
 
@@ -332,6 +380,11 @@ class ArucoNode(rclpy.node.Node):
             self.get_parameter("use_depth_input").get_parameter_value().bool_value
         )
         self.get_logger().info(f"Use depth input: {self.use_depth_input}")
+
+        self.continuous_detection = (
+            self.get_parameter("continuous_detection").get_parameter_value().bool_value
+        )
+        self.get_logger().info(f"Continuous detection: {self.continuous_detection}")
 
         self.image_topic = (
             self.get_parameter("image_topic").get_parameter_value().string_value
