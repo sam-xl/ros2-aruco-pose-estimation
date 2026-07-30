@@ -3,10 +3,11 @@
     <arg name="camera_frame" default="camera_color_optical_frame"/>
     <arg name="marker_size" default="0.097"/>
     <arg name="tool_frame" default="ur10e_tool0"/>
+    <arg name="aruco_dictionary_id" default="DICT_ARUCO_ORIGINAL"/>
 
     <node name="aruco_pose_estimation" pkg="aruco_pose_estimation" exec="aruco_node.py">
         <param name="marker_size" value="$(var marker_size)"/>
-        <param name="aruco_dictionary_id" value="DICT_ARUCO_ORIGINAL"/>
+        <param name="aruco_dictionary_id" value="$(var aruco_dictionary_id)"/>
         <param name="image_topic" value="$(var image_topic)"/>
         <param name="use_depth_input" value="false"/>
         <!-- <param name="depth_image_topic" value=/> -->
