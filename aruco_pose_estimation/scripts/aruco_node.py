@@ -130,14 +130,14 @@ class ArucoNode(rclpy.node.Node):
         self.intrinsic_mat = None
         self.distortion = None
 
-        # code for updated version of cv2 (4.7.0)
-        # self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
-        # self.aruco_parameters = cv2.aruco.DetectorParameters()
-        # self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dictionary, self.aruco_parameters)
-
-        # old code version
         self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
-        self.aruco_parameters = cv2.aruco.DetectorParameters_create()
+
+        if hasattr(cv2.aruco, "DetectorParameters_create"):
+            # cv2 <= 4.6.0
+            self.aruco_parameters = cv2.aruco.DetectorParameters_create()
+        else:
+            # cv2 >= 4.7.0
+            self.aruco_parameters = cv2.aruco.DetectorParameters()
 
         # wait until camera info comes in
         rclpy.spin_until_future_complete(self, future=self.future_rcv_info, timeout_sec = 10)
