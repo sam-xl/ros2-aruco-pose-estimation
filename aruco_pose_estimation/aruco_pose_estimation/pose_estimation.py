@@ -96,9 +96,9 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
             else:
                 # use tvec from aruco estimator as estimated pose
                 pose = Pose()
-                pose.position.x = float(tvec[0])
-                pose.position.y = float(tvec[1])
-                pose.position.z = float(tvec[2])
+                pose.position.x = float(tvec[0][0])
+                pose.position.y = float(tvec[1][0])
+                pose.position.z = float(tvec[2][0])
 
             pose.orientation.x = quat[0]
             pose.orientation.y = quat[1]
