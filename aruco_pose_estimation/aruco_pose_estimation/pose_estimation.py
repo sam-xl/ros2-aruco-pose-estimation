@@ -78,9 +78,14 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
 
             if (depth_frame is not None):
                 # get the centroid of the pointcloud
-                centroid = depth_to_pointcloud_centroid(depth_image=depth_frame,
-                                                        intrinsic_matrix=matrix_coefficients,
-                                                        corners=corners[i])
+                try:
+                    centroid = depth_to_pointcloud_centroid(
+                        depth_image=depth_frame,
+                        intrinsic_matrix=matrix_coefficients,
+                        corners=corners[i],
+                    )
+                except Exception:
+                    depth_frame = None
 
                 # log comparison between depthcloud centroid and tvec estimated positions
                 logger.info(f"depthcloud centroid = {centroid}")
@@ -109,6 +114,8 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
             pose_array.poses.append(pose)
             markers.poses.append(pose)
             markers.marker_ids.append(marker_id[0])
+    else:
+        logger.warn("Detected no markers.")
 
     return frame_processed, pose_array, markers
 
@@ -147,77 +154,66 @@ def my_estimatePoseSingleMarkers(corners, marker_size, camera_matrix, distortion
     return tvec, rvec, quaternion
 
 
-def depth_to_pointcloud_centroid(depth_image: np.array, intrinsic_matrix: np.array,
-                                 corners: np.array) -> np.array:
+def depth_to_pointcloud_centroid(
+    depth_image: np.ndarray, intrinsic_matrix: np.ndarray, corners: np.ndarray
+) -> np.ndarray:
     """
-    This function takes a depth image and the corners of a quadrilateral as input,
-    and returns the centroid of the corresponding pointcloud.
+    Takes a depth image (in METERS, float) and the corners of a quadrilateral,
+    and returns the centroid (x, y, z) of the corresponding pointcloud, in meters.
 
     Args:
-        depth_image: A 2D numpy array representing the depth image.
-        corners: A list of 4 tuples, each representing the (x, y) coordinates of a corner.
+        depth_image: 2D array of depth values in meters. Invalid pixels should be
+                      0 or NaN.
+        intrinsic_matrix: 3x3 camera intrinsic matrix (float).
+        corners: shape (4, 2) array of (x, y) pixel coordinates.
 
     Returns:
-        A tuple (x, y, z) representing the centroid of the segmented pointcloud.
+        np.ndarray of shape (3,), dtype float64: (x, y, z) centroid in meters.
     """
+    corners = np.asarray(corners)
+    if corners.ndim == 3:
+        corners = corners.reshape(-1, 2)
 
-    # Get image parameters
     height, width = depth_image.shape
-    
+    corners_indices = np.round(corners).astype(
+        np.int32
+    )  # pixel indices stay int — that's correct
 
-    # Check if all corners are within image bounds
-    # corners has shape (1, 4, 2)
-    corners_indices = np.array([(int(x), int(y)) for x, y in corners[0]])
+    if (
+        np.any(corners_indices[:, 0] < 0)
+        or np.any(corners_indices[:, 0] >= width)
+        or np.any(corners_indices[:, 1] < 0)
+        or np.any(corners_indices[:, 1] >= height)
+    ):
+        raise ValueError("One or more corners are outside the image bounds.")
 
-    for x, y in corners_indices:
-        if x < 0 or x >= width or y < 0 or y >= height:
-            raise ValueError("One or more corners are outside the image bounds.")
+    mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.fillPoly(mask, [corners_indices], color=1)
 
-    # bounding box of the polygon
-    x_min = int(min(corners_indices[:, 0]))
-    x_max = int(max(corners_indices[:, 0]))
-    y_min = int(min(corners_indices[:, 1]))
-    y_max = int(max(corners_indices[:, 1]))
+    ys, xs = np.nonzero(mask)  # pixel indices, int — correct
+    depths = depth_image[ys, xs].astype(np.float64)  # depth values, float
 
-    # create array of pixels inside the polygon defined by the corners
-    # search for pixels inside the squared bounding box of the polygon
-    points = []
-    for x in range(x_min, x_max):
-        for y in range(y_min, y_max):
-            if is_pixel_in_polygon(pixel=(x, y), corners=corners_indices):
-                # add point to the list of points
-                points.append([x, y, depth_image[y, x]])
+    valid = np.isfinite(depths) & (depths > 0)
+    if not np.any(valid):
+        raise ValueError("No valid depth points found inside the given polygon.")
 
-    # Convert points to numpy array
-    points = np.array(points, dtype=np.uint16)
-   
-    # convert to open3d image
-    #depth_segmented = geometry.Image(points)
-    # create pinhole camera model
-    #pinhole_matrix = camera.PinholeCameraIntrinsic(width=width, height=height, 
-    #                                               intrinsic_matrix=intrinsic_matrix)
-    # Convert points to Open3D pointcloud
-    #pointcloud = geometry.PointCloud.create_from_depth_image(depth=depth_segmented, intrinsic=pinhole_matrix,
-    #                                                         depth_scale=1000.0)
+    xs_f = xs[valid].astype(np.float64)
+    ys_f = ys[valid].astype(np.float64)
+    z = depths[valid]  # already float64
 
-    # apply formulas to pointcloud, where 
-    # fx = intrinsic_matrix[0, 0], fy = intrinsic_matrix[1, 1]
-    # cx = intrinsic_matrix[0, 2], cy = intrinsic_matrix[1, 2], 
-    # u = x, v = y, d = depth_image[y, x], depth_scale = 1000.0,
-    # z = d / depth_scale
-    # x = (u - cx) * z / fx
-    # y = (v - cy) * z / fy
+    intrinsic_matrix = np.asarray(
+        intrinsic_matrix, dtype=np.float64
+    )  # guard against int intrinsics
+    fx, fy = intrinsic_matrix[0, 0], intrinsic_matrix[1, 1]
+    cx, cy = intrinsic_matrix[0, 2], intrinsic_matrix[1, 2]
 
-    # create pointcloud
-    pointcloud = []
-    for x, y, d in points:
-        z = d / 1000.0
-        x = (x - intrinsic_matrix[0, 2]) * z / intrinsic_matrix[0, 0]
-        y = (y - intrinsic_matrix[1, 2]) * z / intrinsic_matrix[1, 1]
-        pointcloud.append([x, y, z])
+    x = (xs_f - cx) * z / fx
+    y = (ys_f - cy) * z / fy
 
-    # Calculate centroid from pointcloud
-    centroid = np.mean(np.array(pointcloud, dtype=np.uint16), axis=0)
+    pointcloud = np.stack([x, y, z], axis=1).astype(
+        np.float64
+    )  # explicit, no accidental dtype
+    centroid = np.mean(pointcloud, axis=0)
 
     return centroid
 
