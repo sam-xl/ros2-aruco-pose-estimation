@@ -24,13 +24,20 @@ git clone https://github.com/sam-xl/ros2-aruco-pose-estimation.git
 Install the dependencies of the cloned packages using `rosdep`:
 
 ```bash
-rosdep install --from-paths . -iy
+rosdep install --from-paths . -iy --skip-keys opencv-python
+```
+Installation of opencv-python from package.xml as a newer version is required for the aruco marker `DICT_ARUCO_MIP_36h12` which is not found in the version installed by rosdep.
+
+Run the dependencies manually for this repo to work.
+```
+pip install opencv-python==4.13.0.92 --break-system-packages
+pip install "numpy<2" --break-system-packages
 ```
 
 Finally, build all packages in the workspace:
 
 ```bash
-colcon build
+colcon build --symlink-install
 ```
 
 ## Usage
