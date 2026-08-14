@@ -414,20 +414,26 @@ class ArucoNode(rclpy.node.Node):
                                                      aruco_params=self.aruco_parameters,
                                                      marker_size=self.marker_size, matrix_coefficients=self.intrinsic_mat,
                                                      distortion_coefficients=self.distortion, pose_array=pose_array, markers=markers)
-            # Return the first pose as the transform
+            idx = 0
             if len(markers.marker_ids)>0:
+
+                for i, marker_id in enumerate(markers.marker_ids):
+                    if marker_id == request.marker_id:
+                        idx = i
+                        break
+
                 T_marker_cam.header.stamp = self.get_clock().now().to_msg()
                 T_marker_cam.header.frame_id = self.camera_frame
                 T_marker_cam.child_frame_id = request.marker_frame_id
 
-                T_marker_cam.transform.translation.x = pose_array.poses[0].position.x
-                T_marker_cam.transform.translation.y = pose_array.poses[0].position.y
-                T_marker_cam.transform.translation.z = pose_array.poses[0].position.z
+                T_marker_cam.transform.translation.x = pose_array.poses[idx].position.x
+                T_marker_cam.transform.translation.y = pose_array.poses[idx].position.y
+                T_marker_cam.transform.translation.z = pose_array.poses[idx].position.z
 
-                T_marker_cam.transform.rotation.x = pose_array.poses[0].orientation.x
-                T_marker_cam.transform.rotation.y = pose_array.poses[0].orientation.y
-                T_marker_cam.transform.rotation.z = pose_array.poses[0].orientation.z
-                T_marker_cam.transform.rotation.w = pose_array.poses[0].orientation.w
+                T_marker_cam.transform.rotation.x = pose_array.poses[idx].orientation.x
+                T_marker_cam.transform.rotation.y = pose_array.poses[idx].orientation.y
+                T_marker_cam.transform.rotation.z = pose_array.poses[idx].orientation.z
+                T_marker_cam.transform.rotation.w = pose_array.poses[idx].orientation.w
                 
                 T_cam_base =  self.tf_buffer.lookup_transform(request.base_frame_id, self.camera_frame, rclpy.time.Time()) # camera (from_frame_id) with respect to base_link (to_frame_id)
                 mat_marker_base = _transform_to_affine(T_cam_base)@_transform_to_affine(T_marker_cam) # marker with respect to base link
