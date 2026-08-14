@@ -40,9 +40,11 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
     # old code version
     # parameters = cv2.aruco.DetectorParameters_create()
     # corners, marker_ids, _ = cv2.aruco.detectMarkers(frame, aruco_dict_type, parameters=parameters)
+    detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+    corners, marker_ids, rejected = detector.detectMarkers(image=rgb_frame)
 
     # new code version
-    corners, marker_ids, _ = cv2.aruco.detectMarkers(image=rgb_frame, dictionary=aruco_dict, parameters=aruco_params)
+    # corners, marker_ids, _ = cv2.aruco.detectMarkers(image=rgb_frame, dictionary=aruco_dict, parameters=aruco_params)
 
     frame_processed = rgb_frame
     logger = rcutils_logger.RcutilsLogger(name="aruco_node")
@@ -84,12 +86,13 @@ def pose_estimation(rgb_frame: np.array, depth_frame: np.array, aruco_dict, aruc
                         intrinsic_matrix=matrix_coefficients,
                         corners=corners[i],
                     )
+                    # log comparison between depthcloud centroid and tvec estimated positions
+                    logger.info(f"depthcloud centroid = {centroid}")
+                    logger.info(f"tvec = {tvec[0]} {tvec[1]} {tvec[2]}")
+
                 except Exception:
                     depth_frame = None
 
-                # log comparison between depthcloud centroid and tvec estimated positions
-                logger.info(f"depthcloud centroid = {centroid}")
-                logger.info(f"tvec = {tvec[0]} {tvec[1]} {tvec[2]}")
 
             # compute pose from the rvec and tvec arrays
             if (depth_frame is not None):
