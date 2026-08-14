@@ -208,7 +208,10 @@ class ArucoNode(rclpy.node.Node):
 
         # convert the image messages to cv2 format
         cv_depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
+        cv_depth_image = cv_depth_image / 1000.0  # mm -> m (D400 default depth_units = 0.001)
         cv_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="rgb8")
+        self.cv_image = cv_image
+        self.cv_depth_image = cv_depth_image
 
         # create the ArucoMarkers and PoseArray messages
         markers = ArucoMarkers()
